@@ -1,0 +1,5 @@
+2012年07月09日
+1) 升级hbase从0.90.4到0.92.1
+2) 升级相关的jar包：新增common-configuration包、引入hbase, hadoop以及zookeeper包。
+
+2012年6月20日 修复delete中的bug, getHTable没有使用hbaseInstanceName来。
