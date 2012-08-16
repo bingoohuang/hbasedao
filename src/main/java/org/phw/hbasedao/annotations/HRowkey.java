@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
  *
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(value = { ElementType.FIELD })
+@Target(ElementType.FIELD)
 public @interface HRowkey {
     // Just a flag.
 }

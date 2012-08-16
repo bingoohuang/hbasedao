@@ -31,5 +31,7 @@ public class GetTest {
         while ((result = scanner.next()) != null) {
             System.out.println(result);
         }
+        
+        table.close();
     }
 }

@@ -13,9 +13,9 @@ import static com.google.common.collect.Maps.*;
 
 public class Types {
     private static Map<Class<?>, Class<?>> primitiveMap = newHashMap();
-    private static Map<Class, BytesConvertable> basicConverters = newHashMap();
-    private static Map<Class, Integer> bytesLenMap = newHashMap();
-    private static BytesConvertable jsonConverter = new BytesConvertable<Object>() {
+    private static Map<Class<?>, BytesConvertable<?>> basicConverters = newHashMap();
+    private static Map<Class<?>, Integer> bytesLenMap = newHashMap();
+    private static BytesConvertable<Object> jsonConverter = new BytesConvertable<Object>() {
 
         @Override
         public byte[] toBytes(Object object) {
@@ -164,56 +164,48 @@ public class Types {
         });
     }
 
-    public static byte[] toBytes(Object value) {
-        if (value == null) {
-            return null;
-        }
+    @SuppressWarnings("unchecked")
+    public static <T> byte[] toBytes(T value) {
+        if (value == null) return null;
 
-        if (value instanceof byte[]) {
-            return (byte[]) value;
-        }
+        if (value instanceof byte[]) return (byte[]) value;
 
-        Class valueClass = value.getClass();
+        Class<?> valueClass = value.getClass();
 
-        BytesConvertable bytesConvertable = basicConverters.get(valueClass);
+        BytesConvertable<?> bytesConvertable = basicConverters.get(valueClass);
         if (bytesConvertable == null && value instanceof BytesConvertable) {
-            bytesConvertable = (BytesConvertable) value;
+            bytesConvertable = (BytesConvertable<?>) value;
         }
         if (bytesConvertable == null) {
             bytesConvertable = jsonConverter;
         }
 
-        return bytesConvertable.toBytes(value);
+        return ((BytesConvertable<T>) bytesConvertable).toBytes(value);
     }
 
     public static <T> int getBytesLen(Class<T> type) {
-        Class targetType = type;
-        if (targetType.isPrimitive()) {
-            targetType = primitiveMap.get(targetType);
-        }
+        Class<?> targetType = type;
+        if (targetType.isPrimitive()) targetType = primitiveMap.get(targetType);
 
         Integer bytesLen = bytesLenMap.get(targetType);
 
         return bytesLen != null ? bytesLen.intValue() : -1;
     }
 
+    @SuppressWarnings("unchecked")
     public static <T> T fromBytes(byte[] bytes, Class<T> type) {
-        if (bytes == null) {
-            return null;
-        }
+        if (bytes == null) { return null; }
 
-        if (type == byte[].class) {
-            return (T) bytes;
-        }
+        if (type == byte[].class) { return (T) bytes; }
 
-        Class targetType = type;
+        Class<?> targetType = type;
         if (targetType.isPrimitive()) {
             targetType = primitiveMap.get(targetType);
         }
 
-        BytesConvertable bytesConvertable = basicConverters.get(targetType);
+        BytesConvertable<?> bytesConvertable = basicConverters.get(targetType);
         if (bytesConvertable == null && BytesConvertable.class.isAssignableFrom(type)) {
-            bytesConvertable = (BytesConvertable) Clazz.newInstance(type);
+            bytesConvertable = (BytesConvertable<?>) Clazz.newInstance(type);
         }
         if (bytesConvertable == null) {
             bytesConvertable = jsonConverter;

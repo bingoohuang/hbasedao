@@ -5,11 +5,18 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * HBase连接配置标注。
+ * @author Bingoo
+ *
+ */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
-public @interface HCascade {
+@Target({ ElementType.METHOD, ElementType.TYPE })
+public @interface HConnectionConfig {
+    /**
+     * instance name.
+     * @return
+     */
+    String value() default "";
 
-    Class<?> clazz() default void.class;
-
-    int rowkeyBytesLen() default -1;
 }

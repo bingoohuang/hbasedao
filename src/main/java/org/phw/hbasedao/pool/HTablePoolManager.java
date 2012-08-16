@@ -1,11 +1,13 @@
 package org.phw.hbasedao.pool;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.HTablePool;
+import org.phw.hbasedao.util.ConfigUtils;
 
 /**
  * HTable Pool 管理器。
@@ -28,6 +30,20 @@ public class HTablePoolManager {
         Configuration configuration = HBaseConfiguration.create();
         configuration.set("hbase.zookeeper.quorum", quorum);
         configuration.set("hbase.zookeeper.property.clientPort", clientPort);
+        configuration.set("zookeeper.session.timeout", "180000");
+        synchronized (confCache) {
+            confCache.put(hbaseInstanceName, configuration);
+        }
+
+        return configuration;
+    }
+
+    public static Configuration createHBaseConfiguration(String hbaseInstanceName, Map<String, String> config) {
+        Configuration configuration = HBaseConfiguration.create();
+        for (Map.Entry<String, String> entry : config.entrySet()) {
+            configuration.set(entry.getKey(), entry.getValue());
+        }
+
         synchronized (confCache) {
             confCache.put(hbaseInstanceName, configuration);
         }
@@ -41,11 +57,12 @@ public class HTablePoolManager {
 
     public static Configuration getHBaseConfiguration(String hbaseInstanceName) {
         Configuration hBaseConfiguration = confCache.get(hbaseInstanceName);
-        if (hBaseConfiguration == null && DEFAULT_INSTANCE.equals(hbaseInstanceName)) {
-            return createHBaseConfiguration(DEFAULT_INSTANCE, "127.0.0.1", "2181");
-        }
+        if (hBaseConfiguration != null) return hBaseConfiguration;
 
-        return hBaseConfiguration;
+        Map<String, String> config = ConfigUtils.getConfig(hbaseInstanceName);
+        if (config != null) return createHBaseConfiguration(DEFAULT_INSTANCE, config);
+
+        return createHBaseConfiguration(DEFAULT_INSTANCE, "127.0.0.1", "2181");
     }
 
     /**
@@ -53,10 +70,7 @@ public class HTablePoolManager {
      * @return HTablePool
      */
     public static HTablePool getHTablePool() {
-        Configuration hBaseConfiguration = getHBaseConfiguration(DEFAULT_INSTANCE);
-        if (hBaseConfiguration == null) {
-            hBaseConfiguration = createHBaseConfiguration(DEFAULT_INSTANCE, "127.0.0.1", "2181");
-        }
+        getHBaseConfiguration(DEFAULT_INSTANCE);
 
         return getHTablePool(DEFAULT_INSTANCE, 100);
     }
@@ -68,15 +82,11 @@ public class HTablePoolManager {
      */
     public static HTablePool getHTablePool(String hbaseInstanceName, int maxSize) {
         HTablePool hTablePool = poolCache.get(hbaseInstanceName);
-        if (hTablePool != null) {
-            return hTablePool;
-        }
+        if (hTablePool != null) { return hTablePool; }
 
         synchronized (poolCache) {
             hTablePool = poolCache.get(hbaseInstanceName);
-            if (hTablePool != null) {
-                return hTablePool;
-            }
+            if (hTablePool != null) { return hTablePool; }
 
             hTablePool = new HTablePoolEnhanced(getHBaseConfiguration(hbaseInstanceName), maxSize);
             poolCache.put(hbaseInstanceName, hTablePool);

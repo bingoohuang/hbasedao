@@ -2,7 +2,6 @@ package org.phw.hbasedao.pool;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -17,9 +16,6 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Row;
 import org.apache.hadoop.hbase.client.RowLock;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.client.coprocessor.Batch.Call;
-import org.apache.hadoop.hbase.client.coprocessor.Batch.Callback;
-import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
 
 /**
  * 增强HTablePool.
@@ -68,7 +64,7 @@ class HTablePoolEnhanced extends HTablePool {
         @Override
         public void close() throws IOException {
             // 归还到池中。
-            this.table.close();
+            putTable(table);
         }
 
         @Override
@@ -111,7 +107,6 @@ class HTablePoolEnhanced extends HTablePool {
             return table.get(gets);
         }
 
-        @SuppressWarnings("deprecation")
         @Override
         public Result getRowOrBefore(byte[] row, byte[] family) throws IOException {
             return table.getRowOrBefore(row, family);
@@ -199,23 +194,6 @@ class HTablePoolEnhanced extends HTablePool {
         @Override
         public void unlockRow(RowLock rl) throws IOException {
             table.unlockRow(rl);
-        }
-
-        @Override
-        public <T extends CoprocessorProtocol, R> Map<byte[], R> coprocessorExec(Class<T> arg0, byte[] arg1,
-                byte[] arg2, Call<T, R> arg3) throws IOException, Throwable {
-            return table.coprocessorExec(arg0, arg1, arg2, arg3);
-        }
-
-        @Override
-        public <T extends CoprocessorProtocol, R> void coprocessorExec(Class<T> arg0, byte[] arg1, byte[] arg2,
-                Call<T, R> arg3, Callback<R> arg4) throws IOException, Throwable {
-            table.coprocessorExec(arg0, arg1, arg2, arg3, arg4);
-        }
-
-        @Override
-        public <T extends CoprocessorProtocol> T coprocessorProxy(Class<T> arg0, byte[] arg1) {
-            return table.coprocessorProxy(arg0, arg1);
         }
     }
 }

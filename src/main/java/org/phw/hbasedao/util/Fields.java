@@ -19,18 +19,19 @@ public class Fields {
         }
     }
 
-    public static Object getFieldValue(MethodAccess methodAccess, FieldAccess fieldAccess, Object target, Field field) {
+    @SuppressWarnings("unchecked")
+    public static <T> T getFieldValue(MethodAccess methodAccess, FieldAccess fieldAccess, Object target, Field field) {
         try {
             String prefix = field.getType() == boolean.class || field.getType() == Boolean.class
                     ? "is" : "get";
             String methodname = prefix + Strs.capitalize(field.getName());
-            return methodAccess.invoke(target, methodname);
+            return (T) methodAccess.invoke(target, methodname);
         }
         catch (IllegalArgumentException e) {
             // Ignore
         }
         try {
-            return fieldAccess.get(target, field.getName());
+            return (T) fieldAccess.get(target, field.getName());
         }
         catch (IllegalArgumentException e) {
             // Ignore

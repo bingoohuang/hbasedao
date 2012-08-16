@@ -11,15 +11,7 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.RowLock;
-import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.FilterList;
@@ -44,8 +36,6 @@ import org.phw.hbasedao.util.Fields;
 import org.phw.hbasedao.util.Hex;
 import org.phw.hbasedao.util.Strs;
 import org.phw.hbasedao.util.Types;
-
-import static com.google.common.io.Closeables.*;
 
 public class DefaultHDao extends BaseHDao {
     private static final int FETCH_ROWS = 1000;
@@ -89,9 +79,7 @@ public class DefaultHDao extends BaseHDao {
             addKeyAndFirstKeyOnlyFilter(get);
 
             Result rs = getValues(ann, get);
-            if (rs.isEmpty() ^ isInsert) {
-                return false;
-            }
+            if (rs.isEmpty() ^ isInsert) { return false; }
 
             Put put = new Put(bRowkey, daoRowlock.getRowLock());
             createPutValues(bean, ann, put, options);
@@ -122,9 +110,7 @@ public class DefaultHDao extends BaseHDao {
 
     @Override
     public <T> void put(List<T> beans, EnumSet<DaoOption> options) throws HDaoException {
-        if (beans == null || beans.size() == 0) {
-            return;
-        }
+        if (beans == null || beans.size() == 0) { return; }
 
         HTableBeanAnn ann = HTableBeanAnnMgr.getBeanAnn(hbaesInstanceName, beans.get(0).getClass());
         ArrayList<Put> putsList = new ArrayList<Put>(beans.size());
@@ -150,9 +136,7 @@ public class DefaultHDao extends BaseHDao {
         HTableBeanAnn ann = HTableBeanAnnMgr.getBeanAnn(hbaesInstanceName, beanClass);
         Get get = new Get(bRowkey);
         Result rs = getValues(ann, get);
-        if (rs.isEmpty()) {
-            return null;
-        }
+        if (rs.isEmpty()) { return null; }
 
         T retBean = Clazz.newInstance(beanClass);
         ann.setRowkey(retBean, bRowkey);
@@ -167,9 +151,7 @@ public class DefaultHDao extends BaseHDao {
 
         Get get = new Get(bRowkey);
         Result rs = getValues(ann, get, family, families);
-        if (rs.isEmpty()) {
-            return null;
-        }
+        if (rs.isEmpty()) { return null; }
 
         T retBean = Clazz.newInstance(beanClass);
         ann.setRowkey(retBean, bRowkey);
@@ -210,7 +192,7 @@ public class DefaultHDao extends BaseHDao {
 
     private void cascadeDeleteByQuery(byte[] bRowkey, EnumSet<DaoOption> options, Field field, HCascade hRelateTo)
             throws HTableDefException, HDaoException {
-        Class clazz = HTableBeanAnnMgr.getCascadeClass(field);
+        Class<?> clazz = HTableBeanAnnMgr.getCascadeClass(field);
 
         HTableBeanAnn hRelateToAnn = HTableBeanAnnMgr.getBeanAnn(hbaesInstanceName, clazz);
 
@@ -229,7 +211,7 @@ public class DefaultHDao extends BaseHDao {
         }
         byte[] stopRow = Bytes.add(bRowkey, padding);
 
-        List lstRelatedValue = queryImpl(clazz, startRow, stopRow, 0, options);
+        List<?> lstRelatedValue = queryImpl(clazz, startRow, stopRow, 0, options);
         for (Object object : lstRelatedValue) {
             delete(options, clazz, hRelateToAnn.getRowkey(object));
         }
@@ -273,12 +255,21 @@ public class DefaultHDao extends BaseHDao {
     }
 
     private HTableInterface getHTable(HTableBeanAnn ann) {
-        HBaseTable hBaseTable = ann.getHBaseTable();
-        return HTablePoolManager.getHTable(hBaseTable.name(), hbaesInstanceName);
+        return getHTable(ann.getHBaseTable());
     }
 
     private HTableInterface getHTable(HBaseTable hBaseTable) {
-        return HTablePoolManager.getHTable(hBaseTable.name(), hbaesInstanceName);
+        return HTablePoolManager.getHTable(getTableName(hBaseTable), hbaesInstanceName);
+    }
+
+    private String getTableName(HBaseTable hBaseTable) {
+        try {
+            return HTableBeanAnnMgr.getTableName(hBaseTable);
+        }
+        catch (HTableDefException e) {
+            // here should not happen b'coz there was table existance check before.s
+            throw new RuntimeException(e); 
+        }
     }
 
     private void createPutValues(Object bean, HTableBeanAnn ann, Put put, EnumSet<DaoOption> options)
@@ -297,16 +288,12 @@ public class DefaultHDao extends BaseHDao {
             }
         }
 
-        if (kvNums == 0) {
-            throw new EmptyValueException("There is no values to do in this operation");
-        }
+        if (kvNums == 0) { throw new EmptyValueException("There is no values to do in this operation"); }
     }
 
     private void processHRelateToFields(HTableBeanAnn ann, Object bean, Field field) throws HDaoException {
         Object relateToValue = Fields.getFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field);
-        if (relateToValue == null) {
-            return;
-        }
+        if (relateToValue == null) { return; }
 
         if (List.class.isAssignableFrom(field.getType())) {
             List<?> list = (List<?>) relateToValue;
@@ -320,11 +307,8 @@ public class DefaultHDao extends BaseHDao {
     }
 
     private int processHDynamicFields(Object bean, HTableBeanAnn ann, Put put, Field field) throws HDaoException {
-        Map<Object, Object> value = (Map) Fields.getFieldValue(
-                ann.getMethodAccess(), ann.getFieldAccess(), bean, field);
-        if (value == null || value.isEmpty()) {
-            return 0;
-        }
+        Map<Object, Object> value = Fields.getFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field);
+        if (value == null || value.isEmpty())  return 0; 
 
         HDynamic hdynamic = field.getAnnotation(HDynamic.class);
         String family = getDefaultFamily(ann, hdynamic.family());
@@ -342,9 +326,7 @@ public class DefaultHDao extends BaseHDao {
         String keyValue = kvAnn.key();
         String key = keyValue == null || keyValue.length() == 0 ? field.getName() : keyValue;
         Object value = Fields.getFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field);
-        if (value == null) {
-            return 0;
-        }
+        if (value == null) { return 0; }
 
         String family = getDefaultFamily(ann, kvAnn.family());
         put.add(Bytes.toBytes(family), Bytes.toBytes(key), Types.toBytes(value));
@@ -379,9 +361,7 @@ public class DefaultHDao extends BaseHDao {
     }
 
     private void unlockRow(DaoRowLock daoRowlock, boolean closeHTable) throws HDaoException {
-        if (daoRowlock == null) {
-            return;
-        }
+        if (daoRowlock == null) { return; }
 
         HTableInterface hTable = daoRowlock.gethTable();
 
@@ -397,13 +377,9 @@ public class DefaultHDao extends BaseHDao {
     }
 
     private boolean isAllowedFamily(String strFamily, String family, String... families) {
-        if (Strs.equals(strFamily, family)) {
-            return true;
-        }
+        if (Strs.equals(strFamily, family)) { return true; }
         for (String fam : families) {
-            if (Strs.equals(strFamily, fam)) {
-                return true;
-            }
+            if (Strs.equals(strFamily, fam)) { return true; }
         }
         return false;
     }
@@ -455,7 +431,7 @@ public class DefaultHDao extends BaseHDao {
     private void processListRelateTo(HTableBeanAnn ann, HCascade hRelateTo, byte[] bRowkey, Object bean,
             EnumSet<DaoOption> options,
             Field field) throws HTableDefException, HDaoException {
-        Class clazz = HTableBeanAnnMgr.getCascadeClass(field);
+        Class<?> clazz = HTableBeanAnnMgr.getCascadeClass(field);
         HTableBeanAnn hRelateToAnn = HTableBeanAnnMgr.getBeanAnn(hbaesInstanceName, clazz);
 
         int rightBytesLen = hRelateTo.rowkeyBytesLen() > 0
@@ -473,7 +449,7 @@ public class DefaultHDao extends BaseHDao {
         }
         byte[] stopRow = Bytes.add(bRowkey, padding);
 
-        List lstRelatedValue = queryImpl(clazz, startRow, stopRow, 0, options);
+        List<?> lstRelatedValue = queryImpl(clazz, startRow, stopRow, 0, options);
         if (hRelateToAnn.getHParentField() != null) {
             for (Object object : lstRelatedValue) {
                 Fields.setFieldValue(hRelateToAnn.getMethodAccess(), hRelateToAnn.getFieldAccess(),
@@ -481,7 +457,7 @@ public class DefaultHDao extends BaseHDao {
             }
         }
 
-        List list = (List) Fields.getFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field);
+        List<Object> list = Fields.getFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field);
         if (list == null) {
             Fields.setFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field, lstRelatedValue);
         }
@@ -509,10 +485,10 @@ public class DefaultHDao extends BaseHDao {
                         Object key = Types.fromBytes(entry.getKey(), hTypePair.keyType());
                         if (key != null) {
                             Object value = Types.fromBytes(entry.getValue(), hTypePair.valueType());
-                            Map map = (Map) Fields.getFieldValue(ann.getMethodAccess(), ann.getFieldAccess(),
+                            Map<Object, Object> map = Fields.getFieldValue(ann.getMethodAccess(), ann.getFieldAccess(),
                                     bean, field);
                             if (map == null) {
-                                map = new HashMap();
+                                map = new HashMap<Object, Object>();
                                 Fields.setFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field, map);
                             }
                             map.put(key, value);
@@ -547,9 +523,7 @@ public class DefaultHDao extends BaseHDao {
             String[] families = ann.getHBaseTable().families();
             retFamily = families != null && families.length > 0 ? families[0] : null;
         }
-        if (Strs.isEmpty(retFamily)) {
-            throw new FamilyEmptyException();
-        }
+        if (Strs.isEmpty(retFamily)) { throw new FamilyEmptyException(); }
         return retFamily;
     }
 
@@ -628,9 +602,7 @@ public class DefaultHDao extends BaseHDao {
         byte[] bkey = Types.toBytes(key);
         byte[] bfamily = Bytes.toBytes(getDefaultFamily(ann, family));
         Result rs = getSingleValue(ann, get, bfamily, bkey);
-        if (rs.isEmpty()) {
-            return null;
-        }
+        if (rs.isEmpty()) { return null; }
 
         return Types.fromBytes(rs.getValue(bfamily, bkey), valueType);
     }
@@ -732,13 +704,13 @@ public class DefaultHDao extends BaseHDao {
             }
             admin.deleteTable(tableName);
             admin.createTable(tableDescriptor);
-            admin.close();
+            //admin.close();
         }
         catch (Exception e) {
             throw new HTableDefException(e);
         }
         finally {
-            closeQuietly(admin);
+            // closeQuietly(admin);
         }
     }
 }

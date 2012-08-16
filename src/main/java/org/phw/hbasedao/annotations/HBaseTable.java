@@ -11,13 +11,18 @@ import java.lang.annotation.Target;
  *
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(value = { ElementType.TYPE })
+@Target(ElementType.TYPE)
 public @interface HBaseTable {
     /**
      * HTable表名。
      * @return
      */
     String name();
+
+    /**
+     * 动态表名创建器。
+     */
+    Class<?> nameCreator() default Void.class;
 
     /**
      * 是否在表不存在的时候自动创建表。
