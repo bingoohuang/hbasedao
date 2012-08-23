@@ -11,8 +11,8 @@ import org.phw.hbasedao.pool.HTablePoolManager;
 public class PutCDRDemo {
     public static void main(String[] args) throws HDaoException {
         System.out.println("Usage(V2012-07-09 FOR XUJG): cdrdemo [quorum port batchNum]");
-        String quorum = "127.0.0.1";
-        //String quorum = "10.142.195.67,10.142.151.88,10.142.195.63";
+//        String quorum = "127.0.0.1";
+        String quorum = "10.142.195.67,10.142.151.88,10.142.195.63";
         if (args.length > 0) {
             quorum = args[0];
         }

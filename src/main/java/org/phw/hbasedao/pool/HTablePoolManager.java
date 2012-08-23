@@ -51,10 +51,6 @@ public class HTablePoolManager {
         return configuration;
     }
 
-    public static Configuration getHBaseConfiguration() {
-        return getHBaseConfiguration(DEFAULT_INSTANCE);
-    }
-
     public static Configuration getHBaseConfiguration(String hbaseInstanceName) {
         Configuration hBaseConfiguration = confCache.get(hbaseInstanceName);
         if (hBaseConfiguration != null) return hBaseConfiguration;
@@ -66,43 +62,27 @@ public class HTablePoolManager {
     }
 
     /**
-     * 取得默认的HTable池。
-     * @return HTablePool
-     */
-    public static HTablePool getHTablePool() {
-        getHBaseConfiguration(DEFAULT_INSTANCE);
-
-        return getHTablePool(DEFAULT_INSTANCE, 100);
-    }
-
-    /**
      * 取得池。
      * @param hbaseInstanceName Hbase实例名称。
      * @return HTablePool
      */
-    public static HTablePool getHTablePool(String hbaseInstanceName, int maxSize) {
+    public static HTablePool getHTablePool(String hbaseInstanceName) {
         HTablePool hTablePool = poolCache.get(hbaseInstanceName);
-        if (hTablePool != null) { return hTablePool; }
+        if (hTablePool != null)  return hTablePool; 
 
         synchronized (poolCache) {
             hTablePool = poolCache.get(hbaseInstanceName);
-            if (hTablePool != null) { return hTablePool; }
+            if (hTablePool != null)  return hTablePool; 
 
-            hTablePool = new HTablePoolEnhanced(getHBaseConfiguration(hbaseInstanceName), maxSize);
+            Configuration hBaseConfig = getHBaseConfiguration(hbaseInstanceName);
+            int maxSize = hBaseConfig.getInt("hhbase.table.references.max", 100);
+            hTablePool = new HTablePoolEnhanced(hBaseConfig, maxSize);
             poolCache.put(hbaseInstanceName, hTablePool);
         }
 
         return hTablePool;
     }
 
-    /**
-     * 取得HTable对象。
-     * @param tableName 表名。
-     * @return HTableInterface
-     */
-    public static HTableInterface getHTable(String tableName) {
-        return getHTablePool().getTable(tableName);
-    }
 
     /**
      * 取得HTable对象。
@@ -111,7 +91,7 @@ public class HTablePoolManager {
      * @return HTableInterface
      */
     public static HTableInterface getHTable(String tableName, String hbaseInstanceName) {
-        return getHTablePool(hbaseInstanceName, 100).getTable(tableName);
+        return getHTablePool(hbaseInstanceName).getTable(tableName);
     }
 
 }

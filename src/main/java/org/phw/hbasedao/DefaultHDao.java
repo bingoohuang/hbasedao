@@ -62,9 +62,8 @@ public class DefaultHDao extends BaseHDao {
     private void createDeleteKeys(String family, Delete delete, Object key, Object... keys) {
         byte[] famBytes = Bytes.toBytes(family);
         delete.deleteColumn(famBytes, Types.toBytes(key));
-        for (Object key1 : keys) {
+        for (Object key1 : keys)
             delete.deleteColumn(famBytes, Types.toBytes(key1));
-        }
     }
 
     @Override
@@ -136,11 +135,12 @@ public class DefaultHDao extends BaseHDao {
         HTableBeanAnn ann = HTableBeanAnnMgr.getBeanAnn(hbaesInstanceName, beanClass);
         Get get = new Get(bRowkey);
         Result rs = getValues(ann, get);
-        if (rs.isEmpty()) { return null; }
+        if (rs.isEmpty()) return null;
 
         T retBean = Clazz.newInstance(beanClass);
         ann.setRowkey(retBean, bRowkey);
         setValues(bRowkey, retBean, ann, rs, options);
+
         return retBean;
     }
 
@@ -151,7 +151,7 @@ public class DefaultHDao extends BaseHDao {
 
         Get get = new Get(bRowkey);
         Result rs = getValues(ann, get, family, families);
-        if (rs.isEmpty()) { return null; }
+        if (rs.isEmpty())  return null; 
 
         T retBean = Clazz.newInstance(beanClass);
         ann.setRowkey(retBean, bRowkey);
@@ -268,7 +268,7 @@ public class DefaultHDao extends BaseHDao {
         }
         catch (HTableDefException e) {
             // here should not happen b'coz there was table existance check before.s
-            throw new RuntimeException(e); 
+            throw new RuntimeException(e);
         }
     }
 
@@ -308,7 +308,7 @@ public class DefaultHDao extends BaseHDao {
 
     private int processHDynamicFields(Object bean, HTableBeanAnn ann, Put put, Field field) throws HDaoException {
         Map<Object, Object> value = Fields.getFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field);
-        if (value == null || value.isEmpty())  return 0; 
+        if (value == null || value.isEmpty()) return 0;
 
         HDynamic hdynamic = field.getAnnotation(HDynamic.class);
         String family = getDefaultFamily(ann, hdynamic.family());
@@ -582,13 +582,12 @@ public class DefaultHDao extends BaseHDao {
     }
 
     private void closeHTable(HTableInterface hTable) {
-        if (hTable != null) {
-            try {
-                hTable.close();
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-            }
+        if (hTable == null) return;
+        try {
+            hTable.close();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
