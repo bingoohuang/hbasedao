@@ -27,7 +27,7 @@ import org.phw.hbasedao.util.Strs;
 
 public class HTableBeanAnnMgr {
     private static volatile HashMap<Class<?>, HTableBeanAnn> cache = new HashMap<Class<?>, HTableBeanAnn>();
-    private static volatile HashSet<String> tableNameChecked = new HashSet<String>();
+    private static volatile HashSet<String> tableExistanceCheckCache = new HashSet<String>();
 
     public static <T> HTableBeanAnn getBeanAnn(String hbaesInstanceName, Class<T> beanClass) throws HTableDefException {
         return getBeanAnn(hbaesInstanceName, null, beanClass);
@@ -179,36 +179,42 @@ public class HTableBeanAnnMgr {
 
     protected static void checkAndCreateTable(String hbaesInstanceName, HBaseTable htableAnn, Class<?> beanClass,
             String tableName) throws HTableDefException {
-        if (tableNameChecked.contains(tableName)) return;
+        String cachedName = hbaesInstanceName + "$" + tableName;
+        if (tableExistanceCheckCache.contains(cachedName)) return;
 
-        synchronized (tableNameChecked) {
-            if (tableNameChecked.contains(tableName)) return;
+        synchronized (tableExistanceCheckCache) {
+            if (tableExistanceCheckCache.contains(cachedName)) return;
 
-            HBaseAdmin admin = null;
-            try {
-                admin = new HBaseAdmin(HTablePoolManager.getHBaseConfig(hbaesInstanceName));
-                if (!admin.tableExists(tableName)) {
-                    if (!htableAnn.autoCreate()) throw new HTableDefException(tableName + " does not exist");
-                    if (htableAnn.families() == null || htableAnn.families().length == 0)
-                        throw new HTableDefException(tableName + " does not define its families");
+            checkAndCreateTableWoCache(hbaesInstanceName, htableAnn, tableName);
+        }
+    }
 
-                    HTableDescriptor tableDesc = new HTableDescriptor(tableName);
-                    for (String fam : htableAnn.families())
-                        tableDesc.addFamily(new HColumnDescriptor(fam));
+    protected static void checkAndCreateTableWoCache(String hbaesInstanceName, HBaseTable htableAnn, String tableName)
+            throws HTableDefException {
+        HBaseAdmin admin = null;
+        try {
+            admin = new HBaseAdmin(HTablePoolManager.getHBaseConfig(hbaesInstanceName));
+            if (!admin.tableExists(tableName)) {
+                if (!htableAnn.autoCreate()) throw new HTableDefException(tableName + " does not exist");
+                if (htableAnn.families() == null || htableAnn.families().length == 0)
+                    throw new HTableDefException(tableName + " does not define its families");
 
-                    admin.createTable(tableDesc);
-                }
-                else if (!admin.isTableEnabled(tableName)) throw new HTableDefException(tableName + " is not enabled");
+                HTableDescriptor tableDesc = new HTableDescriptor(tableName);
+                for (String fam : htableAnn.families())
+                    tableDesc.addFamily(new HColumnDescriptor(fam));
 
-                tableNameChecked.add(tableName);
-                //sadmin.getConnection().
-            } catch (Exception e) {
-                throw new HTableDefException(e);
-            } finally {
-                if (admin != null)
-                    HConnectionManager.deleteConnection(admin.getConfiguration(), true);
-                //closeQuietly(admin);
+                admin.createTable(tableDesc);
             }
+            else if (!admin.isTableEnabled(tableName)) throw new HTableDefException(tableName + " is not enabled");
+
+            tableExistanceCheckCache.add(tableName);
+            //sadmin.getConnection().
+        } catch (Exception e) {
+            throw new HTableDefException(e);
+        } finally {
+            if (admin != null)
+                HConnectionManager.deleteConnection(admin.getConfiguration(), true);
+            //closeQuietly(admin);
         }
     }
 
