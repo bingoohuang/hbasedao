@@ -1,15 +1,12 @@
 package org.phw.hbasedao.pool;
 
-import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.HTablePool;
-import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 
 /**
  * 增强HTablePool.
@@ -48,17 +45,17 @@ class HTablePoolEnhanced extends HTablePool {
             if (!method.getName().equals("close")) return method.invoke(table, args);
 
             htablePool.putTable(table);
-            closeZkWatcher();
+            //            closeZkWatcher();
             return null;
         }
 
-        private void closeZkWatcher() throws IOException {
-            if (!(table instanceof HTable)) return;
-
-            ZooKeeperWatcher watcher = ((HTable) table).getConnection().getZooKeeperWatcher();
-            if (watcher == null) return;
-            watcher.close();
-        }
+        //        private void closeZkWatcher() throws IOException {
+        //            if (!(table instanceof HTable)) return;
+        //
+        //            ZooKeeperWatcher watcher = ((HTable) table).getConnection().getZooKeeperWatcher();
+        //            if (watcher == null) return;
+        //            watcher.close();
+        //        }
     }
 
 }

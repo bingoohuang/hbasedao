@@ -29,9 +29,8 @@ public class HTableBeanAnnMgr {
     public static <T> HTableBeanAnn getBeanAnn(String hbaesInstanceName, Class<T> beanClass) throws HTableDefException {
         HTableBeanAnn beanAnn = getBeanAnn(hbaesInstanceName, null, beanClass);
         HBaseTable htableAnn = beanClass.getAnnotation(HBaseTable.class);
-        if (htableAnn.nameCreator() != Void.class) {
+        if (htableAnn.nameCreator() != Void.class)
             checkTableExistence(hbaesInstanceName, htableAnn, beanClass);
-        }
 
         return beanAnn;
     }
@@ -39,20 +38,17 @@ public class HTableBeanAnnMgr {
     private static <T, P> HTableBeanAnn getBeanAnn(String hbaesInstanceName, Class<P> parentClass, Class<T> beanClass)
             throws HTableDefException {
         HTableBeanAnn hTableBeanAnn = cache.get(beanClass);
-        if (hTableBeanAnn != null) { return hTableBeanAnn; }
+        if (hTableBeanAnn != null) return hTableBeanAnn;
 
         synchronized (cache) {
-            // 检查对象是否使用HTable标注
             HBaseTable htableAnn = beanClass.getAnnotation(HBaseTable.class);
-            if (htableAnn == null) { throw new HTableDefException(beanClass + " is not annotationed by HTable"); }
+            if (htableAnn == null) throw new HTableDefException(beanClass + " is not annotationed by HTable");
 
-            // 检查表是否已经创建
-            if (htableAnn.nameCreator() == Void.class) checkTableExistence(hbaesInstanceName, htableAnn, beanClass);
+            //if (htableAnn.nameCreator() == Void.class) checkTableExistence(hbaesInstanceName, htableAnn, beanClass);
 
             hTableBeanAnn = new HTableBeanAnn();
             hTableBeanAnn.setHBaseTable(beanClass);
 
-            // 检查HRowkey, HColumn, HDynamicColumn标签
             for (Field field : beanClass.getDeclaredFields()) {
                 processHRowkey(hTableBeanAnn, field);
                 processHRowkeyPart(hTableBeanAnn, field);
@@ -64,139 +60,136 @@ public class HTableBeanAnnMgr {
 
             checkAnnotion(beanClass, hTableBeanAnn);
             hTableBeanAnn.afterPropertiesSet();
+
             cache.put(beanClass, hTableBeanAnn);
         }
 
         return hTableBeanAnn;
-
     }
 
     private static <T> void processHParent(Class<T> parentClass, HTableBeanAnn hTableBeanAnn, Field field)
             throws HTableDefException {
-        HParent hParent = field.getAnnotation(HParent.class);
-        if (hParent == null) { return; }
+        if (field.getAnnotation(HParent.class) == null) return;
 
-        if (hTableBeanAnn.getHParentField() != null) { throw new HTableDefException(
-                "@HParent can only define on no more than one field."); }
+        if (hTableBeanAnn.getHParentField() != null)
+            throw new HTableDefException("@HParent can only define on no more than one field.");
 
-        if (parentClass != null && field.getType() != parentClass) { throw new HTableDefException(
-                "@HParent can only define on the field whose type is same with its parent."); }
+        if (parentClass != null && field.getType() != parentClass)
+            throw new HTableDefException("@HParent can only define on the field whose type is same with its parent.");
 
         hTableBeanAnn.setHParent(field);
     }
 
     private static <T> void processHCascade(String hbaesInstanceName, Class<T> beanClass, HTableBeanAnn hTableBeanAnn,
-            Field field)
-            throws HTableDefException {
-        HCascade hRelateTo = field.getAnnotation(HCascade.class);
-        if (hRelateTo == null) { return; }
+            Field field) throws HTableDefException {
+        if (field.getAnnotation(HCascade.class) == null) return;
 
         Class<?> clazz = getCascadeClass(field);
-        if (clazz == void.class) { throw new HTableDefException("@Cascade cannot detect its clazz property."); }
+        if (clazz == void.class) throw new HTableDefException("@Cascade cannot detect its clazz property.");
+
         getBeanAnn(hbaesInstanceName, beanClass, clazz);
         hTableBeanAnn.addHRelateTo(field);
     }
 
     public static Class<?> getCascadeClass(Field field) {
-        HCascade hRelateTo = field.getAnnotation(HCascade.class);
-        Class<?> clazz = hRelateTo.clazz();
+        Class<?> clazz = field.getAnnotation(HCascade.class).clazz();
         if (clazz == void.class) {
             if (List.class.isAssignableFrom(field.getType())
                     && ParameterizedType.class.isAssignableFrom(field.getGenericType().getClass())) {
                 ParameterizedType genericType = (ParameterizedType) field.getGenericType();
                 clazz = (Class<?>) genericType.getActualTypeArguments()[0];
             }
-            else {
-                clazz = field.getType();
-            }
+            else clazz = field.getType();
         }
 
         return clazz;
     }
 
     private static void checkAnnotion(Class<?> beanClass, HTableBeanAnn hTableBeanAnn) throws HTableDefException {
-        if (hTableBeanAnn.getHRowkeyField() == null && hTableBeanAnn.getHRowkeyPartFields().size() == 0) { throw new HTableDefException(
-                beanClass + " does not define a @HRowkey or @HRowkeyPart field."); }
-        if (hTableBeanAnn.getHColumnFields().size() == 0 && hTableBeanAnn.getHDynamicFields().size() == 0) { throw new HTableDefException(
-                beanClass + " should define at least one @HColumn or @HDynamic filed."); }
+        if (hTableBeanAnn.getHRowkeyField() == null && hTableBeanAnn.getHRowkeyPartFields().size() == 0)
+            throw new HTableDefException(beanClass + " does not define a @HRowkey or @HRowkeyPart field.");
+        if (hTableBeanAnn.getHColumnFields().size() == 0 && hTableBeanAnn.getHDynamicFields().size() == 0)
+            throw new HTableDefException(beanClass + " should define at least one @HColumn or @HDynamic filed.");
     }
 
     private static void processHDynamic(HTableBeanAnn hTableBeanAnn, Field field) throws HTableDefException {
         HDynamic hdynamic = field.getAnnotation(HDynamic.class);
-        if (hdynamic == null) { return; }
+        if (hdynamic == null) return;
 
         // 检查rowkey的字段类型是否是TypeConvertable
-        if (!Map.class.isAssignableFrom(field.getType())) { throw new HTableDefException(
-                "@HDynamic can only defined on Map object"); }
+        if (!Map.class.isAssignableFrom(field.getType()))
+            throw new HTableDefException("@HDynamic can only defined on Map object");
 
-        HBaseTable hbaseTable = (HBaseTable) hTableBeanAnn.getBeanClass().getAnnotation(HBaseTable.class);
+        HBaseTable hbaseTable = hTableBeanAnn.getBeanClass().getAnnotation(HBaseTable.class);
         checkFamily(field.getName(), hdynamic.family(), hbaseTable.families());
         hTableBeanAnn.addHDynamic(field);
     }
 
     private static void processHColumn(HTableBeanAnn hTableBeanAnn, Field field) throws HTableDefException {
         HColumn hcolumn = field.getAnnotation(HColumn.class);
-        if (hcolumn == null) { return; }
+        if (hcolumn == null) return;
 
-        HBaseTable hbaseTable = (HBaseTable) hTableBeanAnn.getBeanClass().getAnnotation(HBaseTable.class);
+        HBaseTable hbaseTable = hTableBeanAnn.getBeanClass().getAnnotation(HBaseTable.class);
         checkFamily(field.getName(), hcolumn.family(), hbaseTable.families());
         hTableBeanAnn.addHColumn(field);
     }
 
     private static void checkFamily(String fieldName, String family, String[] families) throws HTableDefException {
-        if (Strs.isEmpty(family) && (families == null || families.length == 0 || Strs.isEmpty(families[0]))) { throw new HTableDefException(
-                fieldName + " does not define a family"); }
+        if (Strs.isEmpty(family) && (families == null || families.length == 0 || Strs.isEmpty(families[0])))
+            throw new HTableDefException(fieldName + " does not define a family");
     }
 
+    /**
+     * @param hTableBeanAnn
+     * @param field
+     * @throws HTableDefException
+     */
     private static void processHRowkey(HTableBeanAnn hTableBeanAnn, Field field) throws HTableDefException {
         HRowkey hrowkey = field.getAnnotation(HRowkey.class);
-        if (hrowkey == null) { return; }
+        if (hrowkey == null) return;
 
-        if (hTableBeanAnn.getHRowkeyField() != null) { throw new HTableDefException(
-                "@HRowkey can only define on no more than one field."); }
-        if (hTableBeanAnn.getHRowkeyPartFields().size() > 0) { throw new HTableDefException(
-                "@HRowkey can not defined along with @HRowkeyPart."); }
+        if (hTableBeanAnn.getHRowkeyField() != null)
+            throw new HTableDefException("@HRowkey can only define on no more than one field.");
+        if (hTableBeanAnn.getHRowkeyPartFields().size() > 0)
+            throw new HTableDefException("@HRowkey can not defined along with @HRowkeyPart.");
 
         hTableBeanAnn.setHRowkey(field);
     }
 
     private static void processHRowkeyPart(HTableBeanAnn hTableBeanAnn, Field field) throws HTableDefException {
         HRowkeyPart hRowkeyPart = field.getAnnotation(HRowkeyPart.class);
-        if (hRowkeyPart != null) {
-            hTableBeanAnn.addHRowkeyPart(field);
-        }
-        if (hTableBeanAnn.getHRowkeyPartFields().size() > 0 && hTableBeanAnn.getHRowkeyField() != null) { throw new HTableDefException(
-                "@HRowkey can not defined along with @HRowkeyPart."); }
+        if (hRowkeyPart != null) hTableBeanAnn.addHRowkeyPart(field);
+
+        if (hTableBeanAnn.getHRowkeyPartFields().size() > 0 && hTableBeanAnn.getHRowkeyField() != null)
+            throw new HTableDefException("@HRowkey can not defined along with @HRowkeyPart.");
     }
 
     private static void checkTableExistence(String hbaesInstanceName, HBaseTable htableAnn, Class<?> beanClass)
             throws HTableDefException {
         // 检查HTable表名是否定义
         String tableName = getTableName(htableAnn);
-        if (Strs.isEmpty(tableName)) { throw new HTableDefException(beanClass
-                + " is annotationed by @HTable with empty name"); }
+        if (Strs.isEmpty(tableName))
+            throw new HTableDefException(beanClass + " is annotationed by @HTable with empty name");
 
         HBaseAdmin admin = null;
         try {
             admin = new HBaseAdmin(HTablePoolManager.getHBaseConfiguration(hbaesInstanceName));
             if (!admin.tableExists(tableName)) {
-                if (!htableAnn.autoCreate()) { throw new HTableDefException(tableName + " does not exist"); }
-                if (htableAnn.families() == null || htableAnn.families().length == 0) { throw new HTableDefException(
-                        tableName + " does not define its families"); }
+                if (!htableAnn.autoCreate()) throw new HTableDefException(tableName + " does not exist");
+                if (htableAnn.families() == null || htableAnn.families().length == 0)
+                    throw new HTableDefException(tableName + " does not define its families");
 
                 HTableDescriptor tableDesc = new HTableDescriptor(tableName);
-                for (String fam : htableAnn.families()) {
+                for (String fam : htableAnn.families())
                     tableDesc.addFamily(new HColumnDescriptor(fam));
-                }
+
                 admin.createTable(tableDesc);
             }
-            else if (!admin.isTableEnabled(tableName)) { throw new HTableDefException(tableName + " is not enabled"); }
+            else if (!admin.isTableEnabled(tableName)) throw new HTableDefException(tableName + " is not enabled");
             //sadmin.getConnection().
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             throw new HTableDefException(e);
-        }
-        finally {
+        } finally {
             //closeQuietly(admin);
         }
     }
@@ -228,8 +221,7 @@ public class HTableBeanAnnMgr {
     public static String invokeMethod(Method method, Object nameCreator, String name) throws HTableDefException {
         try {
             return (String) method.invoke(nameCreator, new Object[] { name });
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             throw new HTableDefException(e);
         }
     }

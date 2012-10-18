@@ -16,6 +16,7 @@ import org.phw.hbasedao.util.ConfigUtils;
  */
 public class HTablePoolManager {
     public static final String DEFAULT_INSTANCE = "default";
+
     private static volatile HashMap<String, HTablePool> poolCache = new HashMap<String, HTablePool>();
     private static volatile HashMap<String, Configuration> confCache = new HashMap<String, Configuration>();
 
@@ -27,28 +28,34 @@ public class HTablePoolManager {
      * @return Configuration
      */
     public static Configuration createHBaseConfiguration(String hbaseInstanceName, String quorum, String clientPort) {
-        Configuration configuration = HBaseConfiguration.create();
-        configuration.set("hbase.zookeeper.quorum", quorum);
-        configuration.set("hbase.zookeeper.property.clientPort", clientPort);
-        configuration.set("zookeeper.session.timeout", "180000");
         synchronized (confCache) {
+            Configuration configuration = confCache.get(hbaseInstanceName);
+            if (configuration != null) return configuration;
+
+            configuration = HBaseConfiguration.create();
+            configuration.set("hbase.zookeeper.quorum", quorum);
+            configuration.set("hbase.zookeeper.property.clientPort", clientPort);
+            configuration.set("zookeeper.session.timeout", "180000");
             confCache.put(hbaseInstanceName, configuration);
+            return configuration;
         }
 
-        return configuration;
     }
 
     public static Configuration createHBaseConfiguration(String hbaseInstanceName, Map<String, String> config) {
-        Configuration configuration = HBaseConfiguration.create();
-        for (Map.Entry<String, String> entry : config.entrySet()) {
-            configuration.set(entry.getKey(), entry.getValue());
-        }
-
         synchronized (confCache) {
+            Configuration configuration = confCache.get(hbaseInstanceName);
+            if (configuration != null) return configuration;
+
+            configuration = HBaseConfiguration.create();
+
+            for (Map.Entry<String, String> entry : config.entrySet()) {
+                configuration.set(entry.getKey(), entry.getValue());
+            }
             confCache.put(hbaseInstanceName, configuration);
+            return configuration;
         }
 
-        return configuration;
     }
 
     public static Configuration getHBaseConfiguration(String hbaseInstanceName) {
@@ -56,9 +63,9 @@ public class HTablePoolManager {
         if (hBaseConfiguration != null) return hBaseConfiguration;
 
         Map<String, String> config = ConfigUtils.getConfig(hbaseInstanceName);
-        if (config != null) return createHBaseConfiguration(DEFAULT_INSTANCE, config);
+        if (config != null) return createHBaseConfiguration(hbaseInstanceName, config);
 
-        return createHBaseConfiguration(DEFAULT_INSTANCE, "127.0.0.1", "2181");
+        return createHBaseConfiguration(hbaseInstanceName, "127.0.0.1", "2181");
     }
 
     /**
@@ -68,21 +75,20 @@ public class HTablePoolManager {
      */
     public static HTablePool getHTablePool(String hbaseInstanceName) {
         HTablePool hTablePool = poolCache.get(hbaseInstanceName);
-        if (hTablePool != null)  return hTablePool; 
+        if (hTablePool != null) return hTablePool;
 
         synchronized (poolCache) {
             hTablePool = poolCache.get(hbaseInstanceName);
-            if (hTablePool != null)  return hTablePool; 
+            if (hTablePool != null) return hTablePool;
 
             Configuration hBaseConfig = getHBaseConfiguration(hbaseInstanceName);
-            int maxSize = hBaseConfig.getInt("hhbase.table.references.max", 100);
+            int maxSize = hBaseConfig.getInt("hhbase.table.references.max", 1);
             hTablePool = new HTablePoolEnhanced(hBaseConfig, maxSize);
             poolCache.put(hbaseInstanceName, hTablePool);
         }
 
         return hTablePool;
     }
-
 
     /**
      * 取得HTable对象。
