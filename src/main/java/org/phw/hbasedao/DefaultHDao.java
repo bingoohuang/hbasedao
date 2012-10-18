@@ -31,14 +31,14 @@ import org.phw.hbasedao.ex.HDaoException;
 import org.phw.hbasedao.ex.HTableDefException;
 import org.phw.hbasedao.impl.HTableBeanAnn;
 import org.phw.hbasedao.impl.HTableBeanAnnMgr;
-
-import static org.phw.hbasedao.impl.HTableBeanAnnMgr.*;
 import org.phw.hbasedao.pool.HTablePoolManager;
 import org.phw.hbasedao.util.Clazz;
 import org.phw.hbasedao.util.Fields;
 import org.phw.hbasedao.util.Hex;
 import org.phw.hbasedao.util.Strs;
 import org.phw.hbasedao.util.Types;
+
+import static org.phw.hbasedao.impl.HTableBeanAnnMgr.*;
 
 public class DefaultHDao extends BaseHDao {
     private static final int FETCH_ROWS = 1000;
@@ -59,7 +59,7 @@ public class DefaultHDao extends BaseHDao {
         byte[] bRowkey = ann.getRowkey(rowkey);
         Delete delete = new Delete(bRowkey);
         createDeleteKeys(getDefaultFamily(ann, family), delete, key, keys);
-        commitDelete(ann.getHBaseTable(), delete);
+        commitDelete(ann.getHBaseTable(), delete, beanClass);
     }
 
     private void createDeleteKeys(String family, Delete delete, Object key, Object... keys) {
@@ -75,20 +75,19 @@ public class DefaultHDao extends BaseHDao {
         byte[] bRowkey = ann.getRowkey(bean);
         DaoRowLock daoRowlock = null;
         try {
-            daoRowlock = getRowLock(ann, bRowkey);
+            daoRowlock = getRowLock(ann, bRowkey, bean.getClass());
 
             Get get = new Get(bRowkey, daoRowlock.getRowLock());
             addKeyAndFirstKeyOnlyFilter(get);
 
-            Result rs = getValues(ann, get);
+            Result rs = getValues(ann, get, bean.getClass());
             if (rs.isEmpty() ^ ifInsertElseUpdate) return false;
 
             Put put = new Put(bRowkey, daoRowlock.getRowLock());
             createPutValues(bean, ann, put, options);
-            commitPut(ann, put);
+            commitPut(ann, put, bean.getClass());
             return true;
-        }
-        finally {
+        } finally {
             unlockRow(daoRowlock);
         }
     }
@@ -107,7 +106,7 @@ public class DefaultHDao extends BaseHDao {
 
         Put put = new Put(bRowkey);
         createPutValues(bean, ann, put, options);
-        commitPut(ann, put);
+        commitPut(ann, put, bean.getClass());
     }
 
     @Override
@@ -124,7 +123,7 @@ public class DefaultHDao extends BaseHDao {
             putsList.add(put);
         }
 
-        commitPut(ann, putsList);
+        commitPut(ann, putsList, beans.get(0).getClass());
     }
 
     @Override
@@ -137,7 +136,7 @@ public class DefaultHDao extends BaseHDao {
     private <T> T getImpl(byte[] bRowkey, Class<T> beanClass, EnumSet<DaoOption> options) throws HDaoException {
         HTableBeanAnn ann = getBeanAnn(hbaesInstanceName, beanClass);
         Get get = new Get(bRowkey);
-        Result rs = getValues(ann, get);
+        Result rs = getValues(ann, get, beanClass);
         if (rs.isEmpty()) return null;
 
         T retBean = Clazz.newInstance(beanClass);
@@ -153,7 +152,7 @@ public class DefaultHDao extends BaseHDao {
         byte[] bRowkey = ann.getRowkey(bean);
 
         Get get = new Get(bRowkey);
-        Result rs = getValues(ann, get, family, families);
+        Result rs = getValues(beanClass, ann, get, family, families);
         if (rs.isEmpty()) return null;
 
         T retBean = Clazz.newInstance(beanClass);
@@ -178,7 +177,7 @@ public class DefaultHDao extends BaseHDao {
     private <T> void delete(byte[] bRowkey, EnumSet<DaoOption> options, Class<T> beanClass) throws HDaoException {
         HTableBeanAnn ann = getBeanAnn(hbaesInstanceName, beanClass);
         Delete delete = new Delete(bRowkey);
-        commitDelete(ann.getHBaseTable(), delete);
+        commitDelete(ann.getHBaseTable(), delete, beanClass);
 
         if (options.contains(DaoOption.CASCADE)) {
             for (Field field : ann.getHRelateToFields()) {
@@ -218,54 +217,50 @@ public class DefaultHDao extends BaseHDao {
             delete(options, clazz, hRelateToAnn.getRowkey(object));
     }
 
-    private Result getValues(HTableBeanAnn ann, Get get, String family, String... families) throws HDaoException {
+    private Result getValues(Class<?> beanClass, HTableBeanAnn ann, Get get, String family, String... families)
+            throws HDaoException {
         HTableInterface hTable = null;
         try {
             get.addFamily(Bytes.toBytes(family));
             for (String fam : families)
                 get.addFamily(Bytes.toBytes(fam));
 
-            hTable = getHTable(ann);
+            hTable = getHTable(ann, beanClass);
             return hTable.get(get);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new HDaoException(e);
-        }
-        finally {
+        } finally {
             closeHTable(hTable);
         }
     }
 
-    private Result getValues(HTableBeanAnn ann, Get get) throws HDaoException {
+    private Result getValues(HTableBeanAnn ann, Get get, Class<?> beanClass) throws HDaoException {
         HTableInterface hTable = null;
         try {
             for (byte[] family : ann.getBfamilies())
                 get.addFamily(family);
 
-            hTable = getHTable(ann);
+            hTable = getHTable(ann, beanClass);
             return hTable.get(get);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new HDaoException(e);
-        }
-        finally {
+        } finally {
             closeHTable(hTable);
         }
     }
 
-    private HTableInterface getHTable(HTableBeanAnn ann) {
-        return getHTable(ann.getHBaseTable());
+    private HTableInterface getHTable(HTableBeanAnn ann, Class<?> beanClass) {
+        return getHTable(ann.getHBaseTable(), beanClass);
     }
 
-    private HTableInterface getHTable(HBaseTable hBaseTable) {
-        return HTablePoolManager.getHTable(getTableName(hBaseTable), hbaesInstanceName);
+    private HTableInterface getHTable(HBaseTable hBaseTable, Class<?> beanClass) {
+        return HTablePoolManager.getHTable(getTableName(hBaseTable, beanClass), hbaesInstanceName);
     }
 
-    private String getTableName(HBaseTable hBaseTable) {
+    private String getTableName(HBaseTable hBaseTable, Class<?> beanClass) {
         try {
-            return HTableBeanAnnMgr.getTableName(hBaseTable);
-        }
-        catch (HTableDefException e) {
+            return HTableBeanAnnMgr.getTableName(hbaesInstanceName, hBaseTable, beanClass);
+        } catch (HTableDefException e) {
             // here should not happen b'coz there was table existance check before.
             throw new RuntimeException(e);
         }
@@ -331,20 +326,19 @@ public class DefaultHDao extends BaseHDao {
     public <T> DaoRowLock lockRow(Class<T> beanClass, Object rowkey) throws HDaoException {
         HTableBeanAnn ann = getBeanAnn(hbaesInstanceName, beanClass);
         byte[] bRowkey = ann.getRowkey(rowkey);
-        return getRowLock(ann, bRowkey);
+        return getRowLock(ann, bRowkey, beanClass);
     }
 
-    private DaoRowLock getRowLock(HTableBeanAnn ann, byte[] bRowkey) throws HDaoException {
+    private DaoRowLock getRowLock(HTableBeanAnn ann, byte[] bRowkey, Class<?> beanClass) throws HDaoException {
         HTableInterface hTable = null;
         try {
-            hTable = getHTable(ann);
+            hTable = getHTable(ann, beanClass);
             RowLock rowLock = hTable.lockRow(bRowkey);
             DaoRowLock daoRowLock = new DaoRowLock();
             daoRowLock.sethTable(hTable);
             daoRowLock.setRowLock(rowLock);
             return daoRowLock;
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new HDaoException(e);
         }
     }
@@ -361,11 +355,9 @@ public class DefaultHDao extends BaseHDao {
 
         try {
             hTable.unlockRow(daoRowlock.getRowLock());
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new HDaoException(e);
-        }
-        finally {
+        } finally {
             closeHTable(closeHTable ? hTable : null);
         }
     }
@@ -520,27 +512,25 @@ public class DefaultHDao extends BaseHDao {
         return retFamily;
     }
 
-    private void commitPut(HTableBeanAnn ann, Put put) throws HDaoException {
-        commitPut(ann, Arrays.asList(put));
+    private void commitPut(HTableBeanAnn ann, Put put, Class<?> beanClass) throws HDaoException {
+        commitPut(ann, Arrays.asList(put), beanClass);
     }
 
-    private void commitPut(HTableBeanAnn ann, List<Put> put) throws HDaoException {
+    private void commitPut(HTableBeanAnn ann, List<Put> put, Class<?> beanClass) throws HDaoException {
         HTableInterface hTable = null;
         try {
-            hTable = getHTable(ann);
+            hTable = getHTable(ann, beanClass);
             hTable.put(put);
             hTable.flushCommits();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new HDaoException(e);
-        }
-        finally {
+        } finally {
             closeHTable(hTable);
         }
     }
 
-    private void commitDelete(HBaseTable htableAnn, Delete delete) throws HDaoException {
-        HTableInterface hTable = getHTable(htableAnn);
+    private void commitDelete(HBaseTable htableAnn, Delete delete, Class<?> beanClass) throws HDaoException {
+        HTableInterface hTable = getHTable(htableAnn, beanClass);
         commitDelete(hTable, delete);
     }
 
@@ -548,11 +538,9 @@ public class DefaultHDao extends BaseHDao {
         try {
             hTable.delete(delete);
             hTable.flushCommits();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new HDaoException(e);
-        }
-        finally {
+        } finally {
             closeHTable(hTable);
         }
     }
@@ -561,8 +549,7 @@ public class DefaultHDao extends BaseHDao {
         if (hTable == null) return;
         try {
             hTable.close();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -576,25 +563,24 @@ public class DefaultHDao extends BaseHDao {
         Get get = new Get(bRowkey);
         byte[] bkey = Types.toBytes(key);
         byte[] bfamily = Bytes.toBytes(getDefaultFamily(ann, family));
-        Result rs = getSingleValue(ann, get, bfamily, bkey);
+        Result rs = getSingleValue(ann, get, bfamily, bkey, beanClass);
         if (rs.isEmpty()) { return null; }
 
         return Types.fromBytes(rs.getValue(bfamily, bkey), valueType);
     }
 
-    private Result getSingleValue(HTableBeanAnn ann, Get get, byte[] family, byte[] key) throws HDaoException {
+    private Result getSingleValue(HTableBeanAnn ann, Get get, byte[] family, byte[] key, Class<?> beanClass)
+            throws HDaoException {
         HTableInterface hTable = null;
         try {
             get.addFamily(family);
             get.setFilter(new QualifierFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(key)));
-            hTable = getHTable(ann);
+            hTable = getHTable(ann, beanClass);
 
             return hTable.get(get);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new HDaoException(e);
-        }
-        finally {
+        } finally {
             closeHTable(hTable);
         }
     }
@@ -607,7 +593,7 @@ public class DefaultHDao extends BaseHDao {
         byte[] bfamily = Bytes.toBytes(getDefaultFamily(ann, family));
         Put put = new Put(bRowkey);
         createPutKv(ann, put, bfamily, key, value, kvs);
-        commitPut(ann, put);
+        commitPut(ann, put, beanClass);
     }
 
     private <T> void createPutKv(HTableBeanAnn ann, Put put, byte[] family, Object key, Object value, Object[] kvs) {
@@ -635,7 +621,7 @@ public class DefaultHDao extends BaseHDao {
             for (byte[] family : ann.getBfamilies())
                 scan.addFamily(family);
 
-            hTable = getHTable(ann);
+            hTable = getHTable(ann, beanClass);
             ResultScanner rr = hTable.getScanner(scan);
 
             int rows = 0;
@@ -651,11 +637,9 @@ public class DefaultHDao extends BaseHDao {
             }
 
             return arrayList;
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new HDaoException(e);
-        }
-        finally {
+        } finally {
             closeHTable(hTable);
         }
     }
@@ -665,8 +649,8 @@ public class DefaultHDao extends BaseHDao {
         HTableBeanAnn ann = getBeanAnn(hbaesInstanceName, beanClass);
         HBaseAdmin admin = null;
         try {
-            admin = new HBaseAdmin(HTablePoolManager.getHBaseConfiguration(hbaesInstanceName));
-            String tableName = getTableName(ann.getHBaseTable());
+            admin = new HBaseAdmin(HTablePoolManager.getHBaseConfig(hbaesInstanceName));
+            String tableName = getTableName(ann.getHBaseTable(), beanClass);
             HTableDescriptor tableDescriptor = admin.getTableDescriptor(Bytes.toBytes(tableName));
 
             if (!admin.isTableDisabled(tableName)) admin.disableTable(tableName);
@@ -674,11 +658,9 @@ public class DefaultHDao extends BaseHDao {
             admin.deleteTable(tableName);
             admin.createTable(tableDescriptor);
             //admin.close();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             throw new HTableDefException(e);
-        }
-        finally {
+        } finally {
             // closeQuietly(admin);
         }
     }

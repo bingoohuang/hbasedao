@@ -14,7 +14,7 @@ public class SimpleBeanTest {
     @Test
     public void testPutAndGet() throws HDaoException {
         //HTablePoolManager.createHBaseConfiguration("bjtest", "10.142.195.67,10.142.151.88,10.142.195.63", "2181");
-        HTablePoolManager.createHBaseConfiguration("bjtest", "10.142.151.88", "2181");
+        HTablePoolManager.getHTablePool("bjtest", "10.20.16.32,10.20.16.35,10.20.16.36", "2181");
         SimpleBean simpleBean1 = new SimpleBean();
         simpleBean1.setRowkey("H40685");
         simpleBean1.setName("黄进兵");

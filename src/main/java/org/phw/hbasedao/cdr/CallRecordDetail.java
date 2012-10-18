@@ -3,8 +3,9 @@ package org.phw.hbasedao.cdr;
 import org.phw.hbasedao.annotations.HBaseTable;
 import org.phw.hbasedao.annotations.HColumn;
 import org.phw.hbasedao.annotations.HRowkeyPart;
+import org.phw.hbasedao.impl.ContextNameCreator;
 
-@HBaseTable(name = "cdr", autoCreate = true)
+@HBaseTable(name = "cdr", nameCreator = ContextNameCreator.class, autoCreate = true)
 public class CallRecordDetail {
     @HRowkeyPart
     private long timestamp; // 主叫号码

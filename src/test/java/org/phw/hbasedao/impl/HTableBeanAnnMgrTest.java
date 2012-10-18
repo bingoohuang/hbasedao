@@ -16,11 +16,11 @@ public class HTableBeanAnnMgrTest {
         final class c {}
 
         ContextNameCreator.setSuffix(null);
-        String tableName = HTableBeanAnnMgr.getTableName(c.class.getAnnotation(HBaseTable.class));
+        String tableName = HTableBeanAnnMgr.getTableName("default", c.class.getAnnotation(HBaseTable.class), c.class);
         assertEquals("hjb", tableName);
 
         ContextNameCreator.setSuffix("001");
-        tableName = HTableBeanAnnMgr.getTableName(c.class.getAnnotation(HBaseTable.class));
+        tableName = HTableBeanAnnMgr.getTableName("default", c.class.getAnnotation(HBaseTable.class), c.class);
         assertEquals("hjb_001", tableName);
     }
 

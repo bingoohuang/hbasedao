@@ -5,12 +5,14 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.HConnectionManager;
 import org.phw.hbasedao.annotations.HBaseTable;
 import org.phw.hbasedao.annotations.HCascade;
 import org.phw.hbasedao.annotations.HColumn;
@@ -25,14 +27,10 @@ import org.phw.hbasedao.util.Strs;
 
 public class HTableBeanAnnMgr {
     private static volatile HashMap<Class<?>, HTableBeanAnn> cache = new HashMap<Class<?>, HTableBeanAnn>();
+    private static volatile HashSet<String> tableNameChecked = new HashSet<String>();
 
     public static <T> HTableBeanAnn getBeanAnn(String hbaesInstanceName, Class<T> beanClass) throws HTableDefException {
-        HTableBeanAnn beanAnn = getBeanAnn(hbaesInstanceName, null, beanClass);
-        HBaseTable htableAnn = beanClass.getAnnotation(HBaseTable.class);
-        if (htableAnn.nameCreator() != Void.class)
-            checkTableExistence(hbaesInstanceName, htableAnn, beanClass);
-
-        return beanAnn;
+        return getBeanAnn(hbaesInstanceName, null, beanClass);
     }
 
     private static <T, P> HTableBeanAnn getBeanAnn(String hbaesInstanceName, Class<P> parentClass, Class<T> beanClass)
@@ -41,10 +39,13 @@ public class HTableBeanAnnMgr {
         if (hTableBeanAnn != null) return hTableBeanAnn;
 
         synchronized (cache) {
+            hTableBeanAnn = cache.get(beanClass);
+            if (hTableBeanAnn != null) return hTableBeanAnn;
+
             HBaseTable htableAnn = beanClass.getAnnotation(HBaseTable.class);
             if (htableAnn == null) throw new HTableDefException(beanClass + " is not annotationed by HTable");
 
-            //if (htableAnn.nameCreator() == Void.class) checkTableExistence(hbaesInstanceName, htableAnn, beanClass);
+            checkTableExistence(hbaesInstanceName, htableAnn, beanClass);
 
             hTableBeanAnn = new HTableBeanAnn();
             hTableBeanAnn.setHBaseTable(beanClass);
@@ -166,35 +167,53 @@ public class HTableBeanAnnMgr {
 
     private static void checkTableExistence(String hbaesInstanceName, HBaseTable htableAnn, Class<?> beanClass)
             throws HTableDefException {
+        if (htableAnn.nameCreator() != Void.class) return;
+
         // 检查HTable表名是否定义
-        String tableName = getTableName(htableAnn);
+        String tableName = htableAnn.name();
         if (Strs.isEmpty(tableName))
             throw new HTableDefException(beanClass + " is annotationed by @HTable with empty name");
 
-        HBaseAdmin admin = null;
-        try {
-            admin = new HBaseAdmin(HTablePoolManager.getHBaseConfiguration(hbaesInstanceName));
-            if (!admin.tableExists(tableName)) {
-                if (!htableAnn.autoCreate()) throw new HTableDefException(tableName + " does not exist");
-                if (htableAnn.families() == null || htableAnn.families().length == 0)
-                    throw new HTableDefException(tableName + " does not define its families");
+        checkAndCreateTable(hbaesInstanceName, htableAnn, beanClass, tableName);
+    }
 
-                HTableDescriptor tableDesc = new HTableDescriptor(tableName);
-                for (String fam : htableAnn.families())
-                    tableDesc.addFamily(new HColumnDescriptor(fam));
+    protected static void checkAndCreateTable(String hbaesInstanceName, HBaseTable htableAnn, Class<?> beanClass,
+            String tableName) throws HTableDefException {
+        if (tableNameChecked.contains(tableName)) return;
 
-                admin.createTable(tableDesc);
+        synchronized (tableNameChecked) {
+            if (tableNameChecked.contains(tableName)) return;
+
+            HBaseAdmin admin = null;
+            try {
+                admin = new HBaseAdmin(HTablePoolManager.getHBaseConfig(hbaesInstanceName));
+                if (!admin.tableExists(tableName)) {
+                    if (!htableAnn.autoCreate()) throw new HTableDefException(tableName + " does not exist");
+                    if (htableAnn.families() == null || htableAnn.families().length == 0)
+                        throw new HTableDefException(tableName + " does not define its families");
+
+                    HTableDescriptor tableDesc = new HTableDescriptor(tableName);
+                    for (String fam : htableAnn.families())
+                        tableDesc.addFamily(new HColumnDescriptor(fam));
+
+                    admin.createTable(tableDesc);
+                }
+                else if (!admin.isTableEnabled(tableName)) throw new HTableDefException(tableName + " is not enabled");
+
+                tableNameChecked.add(tableName);
+                //sadmin.getConnection().
+            } catch (Exception e) {
+                throw new HTableDefException(e);
+            } finally {
+                if (admin != null)
+                    HConnectionManager.deleteConnection(admin.getConfiguration(), true);
+                //closeQuietly(admin);
             }
-            else if (!admin.isTableEnabled(tableName)) throw new HTableDefException(tableName + " is not enabled");
-            //sadmin.getConnection().
-        } catch (Exception e) {
-            throw new HTableDefException(e);
-        } finally {
-            //closeQuietly(admin);
         }
     }
 
-    public static String getTableName(HBaseTable hbaseTable) throws HTableDefException {
+    public static String getTableName(String hbaesInstanceName, HBaseTable hbaseTable, Class<?> beanClass)
+            throws HTableDefException {
         if (hbaseTable.nameCreator() == Void.class) return hbaseTable.name();
 
         Object nameCreator = Clazz.newInstance(hbaseTable.nameCreator());
@@ -202,7 +221,13 @@ public class HTableBeanAnnMgr {
 
         if (method == null) throw new HTableDefException("no proper method found for " + hbaseTable.nameCreator());
 
-        return invokeMethod(method, nameCreator, hbaseTable.name());
+        String tableName = invokeMethod(method, nameCreator, hbaseTable.name());
+        if (Strs.isEmpty(tableName))
+            throw new HTableDefException(hbaseTable.nameCreator() + " create an empty name");
+
+        if (hbaseTable.autoCreate()) checkAndCreateTable(hbaesInstanceName, hbaseTable, beanClass, tableName);
+
+        return tableName;
     }
 
     public static Method findProperMethod(Class<?> clazz) {

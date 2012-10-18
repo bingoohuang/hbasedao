@@ -15,6 +15,8 @@ import org.apache.hadoop.hbase.client.HTablePool;
  */
 class HTablePoolEnhanced extends HTablePool {
 
+    private Configuration config;
+
     /**
      * Constructor to set maximum versions and use the specified configuration.
      * @param config configuration
@@ -22,6 +24,11 @@ class HTablePoolEnhanced extends HTablePool {
      */
     public HTablePoolEnhanced(final Configuration config, final int maxSize) {
         super(config, maxSize);
+        this.config = config;
+    }
+
+    public Configuration getConfig() {
+        return config;
     }
 
     @Override

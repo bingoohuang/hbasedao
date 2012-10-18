@@ -13,6 +13,7 @@ import org.apache.hadoop.hbase.util.Threads;
 import org.phw.hbasedao.DefaultHDao;
 import org.phw.hbasedao.HDao;
 import org.phw.hbasedao.ex.HDaoException;
+import org.phw.hbasedao.impl.ContextNameCreator;
 import org.phw.hbasedao.pool.HTablePoolManager;
 
 public class PutCDRDemo {
@@ -42,13 +43,13 @@ public class PutCDRDemo {
 
         final int batchNum = args.length > 2 ? Integer.valueOf(args[2]) : 1000;
 
-        threadNum = 1000;
+        threadNum = 10;
         if (args.length > 3)
             threadNum = Integer.valueOf(args[3]);
 
         targetNum = threadNum;
 
-        HTablePoolManager.createHBaseConfiguration(HTablePoolManager.DEFAULT_INSTANCE, quorum, port);
+        HTablePoolManager.getHTablePool(HTablePoolManager.DEFAULT_INSTANCE, quorum, port);
         File stopFile = new File("stop");
 
         //        ExecutorService threadPool = Executors.newCachedThreadPool();
@@ -141,9 +142,10 @@ public class PutCDRDemo {
             } catch (HDaoException e) {
                 e.printStackTrace();
             } finally {
-                syncPrint("Thread exiting!");
+
                 synchronized (PutCDRDemo.class) {
                     --threadNum;
+                    syncPrint("Thread exiting, Left", threadNum);
                     try {
                         FileUtils.write(new File("status"), "Threads:" + threadNum);
                     } catch (IOException e) {
@@ -166,6 +168,7 @@ public class PutCDRDemo {
             // if (detectExit()) return;
 
             randomRecord = recordsGenerator.randomRecord(randomRecord);
+            ContextNameCreator.setSuffix("" + random.nextInt(10));
             hdao.put(randomRecord);
 
             if (c == 0) {
