@@ -4,7 +4,7 @@ import org.phw.hbasedao.annotations.HBaseTable;
 import org.phw.hbasedao.annotations.HColumn;
 import org.phw.hbasedao.annotations.HRowkey;
 
-@HBaseTable(name = "simple_bean", autoCreate = true)
+@HBaseTable(name = "test_simple_bean", autoCreate = true)
 public class SimpleBean {
     @HRowkey
     private String rowkey;

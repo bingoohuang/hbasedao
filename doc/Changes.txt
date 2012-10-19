@@ -1,3 +1,6 @@
+2012年10月18日
+1) 解决HTableAdmin zk连接不释放问题
+
 2012年07月09日
 1) 升级hbase从0.90.4到0.92.1
 2) 升级相关的jar包：新增common-configuration包、引入hbase, hadoop以及zookeeper包。

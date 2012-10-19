@@ -12,7 +12,6 @@ import java.util.Map;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HConnectionManager;
 import org.phw.hbasedao.annotations.HBaseTable;
 import org.phw.hbasedao.annotations.HCascade;
 import org.phw.hbasedao.annotations.HColumn;
@@ -21,7 +20,6 @@ import org.phw.hbasedao.annotations.HParent;
 import org.phw.hbasedao.annotations.HRowkey;
 import org.phw.hbasedao.annotations.HRowkeyPart;
 import org.phw.hbasedao.ex.HTableDefException;
-import org.phw.hbasedao.pool.HTablePoolManager;
 import org.phw.hbasedao.util.Clazz;
 import org.phw.hbasedao.util.Strs;
 
@@ -189,11 +187,11 @@ public class HTableBeanAnnMgr {
         }
     }
 
-    protected static void checkAndCreateTableWoCache(String hbaesInstanceName, HBaseTable htableAnn, String tableName)
+    protected static void checkAndCreateTableWoCache(String hbaseInstanceName, HBaseTable htableAnn, String tableName)
             throws HTableDefException {
         HBaseAdmin admin = null;
         try {
-            admin = new HBaseAdmin(HTablePoolManager.getHBaseConfig(hbaesInstanceName));
+            admin = HBaseAdminMgr.createAdmin(hbaseInstanceName);
             if (!admin.tableExists(tableName)) {
                 if (!htableAnn.autoCreate()) throw new HTableDefException(tableName + " does not exist");
                 if (htableAnn.families() == null || htableAnn.families().length == 0)
@@ -208,13 +206,10 @@ public class HTableBeanAnnMgr {
             else if (!admin.isTableEnabled(tableName)) throw new HTableDefException(tableName + " is not enabled");
 
             tableExistanceCheckCache.add(tableName);
-            //sadmin.getConnection().
         } catch (Exception e) {
             throw new HTableDefException(e);
         } finally {
-            if (admin != null)
-                HConnectionManager.deleteConnection(admin.getConfiguration(), true);
-            //closeQuietly(admin);
+            HBaseAdminMgr.close(admin);
         }
     }
 

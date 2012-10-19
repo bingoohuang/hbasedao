@@ -8,20 +8,19 @@ import org.junit.Test;
 import org.phw.hbasedao.DefaultHDao;
 import org.phw.hbasedao.HDao;
 import org.phw.hbasedao.ex.HDaoException;
-import org.phw.hbasedao.pool.HTablePoolManager;
 
 public class SimpleBeanTest {
     @Test
     public void testPutAndGet() throws HDaoException {
         //HTablePoolManager.createHBaseConfiguration("bjtest", "10.142.195.67,10.142.151.88,10.142.195.63", "2181");
-        HTablePoolManager.getHTablePool("bjtest", "10.20.16.32,10.20.16.35,10.20.16.36", "2181");
+//        HTablePoolManager.getHTablePool("bjtest", "10.20.16.32,10.20.16.35,10.20.16.36", "2181");
         SimpleBean simpleBean1 = new SimpleBean();
         simpleBean1.setRowkey("H40685");
         simpleBean1.setName("黄进兵");
         simpleBean1.setAdult(true);
         simpleBean1.setAge(33);
 
-        HDao hdao = new DefaultHDao("bjtest");
+        HDao hdao = new DefaultHDao(/*"bjtest"*/);
         hdao.trunc(SimpleBean.class); // 会删除并且重建表，表所有数据丢失。危险，慎用
 
         boolean insert = hdao.insert(simpleBean1);
