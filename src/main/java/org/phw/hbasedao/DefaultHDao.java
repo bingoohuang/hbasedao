@@ -462,7 +462,7 @@ public class DefaultHDao extends BaseHDao {
         Fields.setFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field, value);
     }
 
-    private <T> T getFieldValue(HTableBeanAnn ann, Object bean, Field field) {
+    private Object getFieldValue(HTableBeanAnn ann, Object bean, Field field) {
         return Fields.getFieldValue(ann.getMethodAccess(), ann.getFieldAccess(), bean, field);
     }
 
