@@ -307,7 +307,8 @@ public class DefaultHDao extends BaseHDao {
     }
 
     private int processHDynamicFields(Object bean, HTableBeanAnn ann, Put put, Field field) throws HDaoException {
-        Map<Object, Object> value = getFieldValue(ann, bean, field);
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> value = (Map<Object, Object>)getFieldValue(ann, bean, field);
         if (value == null || value.isEmpty()) return 0;
 
         HDynamic hdynamic = field.getAnnotation(HDynamic.class);
@@ -449,7 +450,8 @@ public class DefaultHDao extends BaseHDao {
                 setFieldValue(hRelateToAnn, object, hRelateToAnn.getHParentField(), bean);
         }
 
-        List<Object> list = getFieldValue(ann, bean, field);
+        @SuppressWarnings("unchecked")
+        List<Object> list = (List<Object>)getFieldValue(ann, bean, field);
 
         if (list == null) setFieldValue(ann, bean, field, lstRelatedValue);
         else for (Object object : lstRelatedValue)
@@ -481,7 +483,8 @@ public class DefaultHDao extends BaseHDao {
                     if (key == null) continue;
 
                     Object value = Types.fromBytes(entry.getValue(), hTypePair.valueType());
-                    Map<Object, Object> map = getFieldValue(ann, bean, field);
+                    @SuppressWarnings("unchecked")
+                    Map<Object, Object> map = (Map<Object, Object>)getFieldValue(ann, bean, field);
                     if (map == null) {
                         map = new HashMap<Object, Object>();
                         setFieldValue(ann, bean, field, map);
