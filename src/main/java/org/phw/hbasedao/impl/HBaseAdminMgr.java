@@ -20,9 +20,12 @@ public class HBaseAdminMgr {
     }
 
     public static void close(HBaseAdmin admin) {
-        if (admin != null)
-            HConnectionManager.deleteConnection(admin.getConfiguration(), true);
+        if (admin == null) return;
 
+        // HACK: HBasedmin copies Configuration which is used as connection cache key.
+        // So we need to delete it after using or it will cause zk connection leak.
+        // The second parameter stopProxy is not clear to me. I just set it to true.
+        HConnectionManager.deleteConnection(admin.getConfiguration(), true);
     }
 
 
