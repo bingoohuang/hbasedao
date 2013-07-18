@@ -629,6 +629,8 @@ public class DefaultHDao extends BaseHDao {
             throws HDaoException {
         HTableBeanAnn ann = getBeanAnn(hbaseInstanceName, beanClass);
         Scan scan = stopRow != null ? new Scan(startRow, stopRow) : new Scan(startRow);
+        scan.setCaching(FETCH_ROWS);
+
         HTableInterface hTable = null;
         try {
             for (byte[] family : ann.getBfamilies())
