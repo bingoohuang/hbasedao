@@ -1,4 +1,4 @@
 hbasedao
 ========
 
-java dao for hbaes
+java simple dao for hbase
